@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as PIXI from "pixi.js";
 
 export default function App() {
-  const pixiContainer = useRef(null);
+  const pixiContainer = useRef<HTMLDivElement | null>(null);
   const [lives, setLives] = useState(10);
   const [score, setScore] = useState(0);
   const [wave, setWave] = useState(1);
@@ -15,7 +15,7 @@ export default function App() {
       backgroundColor: 0x0a0e27,
       antialias: true,
     });
-    pixiContainer.current.appendChild(app.view);
+    pixiContainer.current?.appendChild(app.view as unknown as Node);
 
     // --- Variables internes ---
     let livesInternal = 10;
@@ -105,7 +105,7 @@ export default function App() {
     app.stage.addChild(particles);
 
     for (let i = 0; i < 30; i++) {
-      const particle = new PIXI.Graphics();
+      const particle = new PIXI.Graphics() as PIXI.Graphics & { vx: number; vy: number };
       particle.beginFill(0x4affff, Math.random() * 0.3);
       particle.drawCircle(0, 0, Math.random() * 3 + 1);
       particle.endFill();
@@ -117,7 +117,14 @@ export default function App() {
     }
 
     // --- Ennemis ---
-    const enemies = [];
+    interface Enemy {
+      sprite: PIXI.Container;
+      progress: number;
+      glow: PIXI.Graphics;
+      rotation: number;
+    }
+
+    const enemies: Enemy[] = [];
     const createEnemy = (offset = 0) => {
       const enemyContainer = new PIXI.Container();
 
@@ -203,12 +210,13 @@ export default function App() {
 
       // Animation des particules
       particles.children.forEach((p) => {
-        p.x += p.vx;
-        p.y += p.vy;
-        if (p.x < 0) p.x = 1200;
-        if (p.x > 1200) p.x = 0;
-        if (p.y < 0) p.y = 700;
-        if (p.y > 700) p.y = 0;
+        const particle = p as PIXI.Graphics & { vx: number; vy: number };
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        if (particle.x < 0) particle.x = 1200;
+        if (particle.x > 1200) particle.x = 0;
+        if (particle.y < 0) particle.y = 700;
+        if (particle.y > 700) particle.y = 0;
       });
 
       // Spawn
@@ -271,7 +279,7 @@ export default function App() {
     });
 
     // --- Redémarrer ---
-    app.view.addEventListener("click", () => {
+    (app.view as HTMLCanvasElement).addEventListener("click", () => {
       if (!gameOverInternal) return;
 
       gameOverInternal = false;
