@@ -8,6 +8,10 @@ export default function App() {
   const [wave, setWave] = useState(1);
   const [gameOver, setGameOver] = useState(false);
 
+  // refs pour déclencher un reset et un refetch depuis le bouton
+  const resetRef = useRef<() => void>();
+  const fetchStateRef = useRef<() => void>();
+
   useEffect(() => {
     const app = new PIXI.Application({
       width: 1200,
@@ -438,10 +442,8 @@ export default function App() {
       }
     });
 
-    // --- RESTART SUR CLIC (après game over) ---
-    const onCanvasClick = () => {
-      if (!gameOverInternal) return;
-
+    // --- RESET LOCAL réutilisable (bouton & restart) ---
+    const hardResetLocal = () => {
       gameOverInternal = false;
       livesInternal = 10;
       scoreInternal = 0;
@@ -458,6 +460,16 @@ export default function App() {
       msSinceSpawn = 0;
       createEnemy(0);
     };
+    resetRef.current = hardResetLocal;
+
+    // exp. fetchState vers le bouton
+    fetchStateRef.current = () => { void fetchStateOnce(); };
+
+    // --- RESTART SUR CLIC (après game over) ---
+    const onCanvasClick = () => {
+      if (!gameOverInternal) return;
+      hardResetLocal();
+    };
     (app.view as HTMLCanvasElement).addEventListener("click", onCanvasClick);
 
     // --- CLEANUP ---
@@ -467,6 +479,18 @@ export default function App() {
       app.destroy(true, true);
     };
   }, []);
+
+  // handler bouton Reset
+  const onResetClick = async () => {
+    try {
+      await fetch("https://game-api-4dbs.onrender.com/reset", { method: "POST" });
+    } catch {
+      // on s'en fout pour le front: on reset quand même localement
+    }
+    // reset local immédiat puis refetch l'état serveur
+    resetRef.current?.();
+    fetchStateRef.current?.();
+  };
 
   // --- UI / HUD ---
   return (
@@ -546,19 +570,42 @@ export default function App() {
           </div>
         </div>
 
-        {/* Titre */}
+        {/* Titre + Bouton Reset */}
         <div
           style={{
             position: "absolute", top: 20, right: 20,
-            background: "linear-gradient(135deg, rgba(0,255,136,0.95) 0%, rgba(0,180,100,0.95) 100%)",
-            padding: "15px 30px", borderRadius: 12,
-            border: "2px solid rgba(100,255,200,0.5)",
-            boxShadow: "0 4px 15px rgba(0,255,136,0.4)",
+            display: "flex", gap: 12, alignItems: "center",
           }}
         >
-          <div style={{ fontSize: 24, color: "#0a1428", fontWeight: "bold", letterSpacing: 2 }}>
+          <div
+            style={{
+              background: "linear-gradient(135deg, rgba(0,255,136,0.95) 0%, rgba(0,180,100,0.95) 100%)",
+              padding: "15px 30px", borderRadius: 12,
+              border: "2px solid rgba(100,255,200,0.5)",
+              boxShadow: "0 4px 15px rgba(0,255,136,0.4)",
+              fontSize: 24, color: "#0a1428", fontWeight: "bold", letterSpacing: 2,
+            }}
+          >
             Table interactive
           </div>
+
+          <button
+            onClick={onResetClick}
+            style={{
+              cursor: "pointer",
+              background: "linear-gradient(135deg, rgba(255,196,0,0.95) 0%, rgba(255,140,0,0.95) 100%)",
+              color: "#0a1428",
+              fontWeight: 800,
+              border: "2px solid rgba(255,200,120,0.7)",
+              borderRadius: 12,
+              padding: "10px 18px",
+              boxShadow: "0 4px 15px rgba(255,170,0,0.35)",
+            }}
+            aria-label="Reset game"
+            title="Reset (API + Client)"
+          >
+            RESET
+          </button>
         </div>
       </div>
     </div>
