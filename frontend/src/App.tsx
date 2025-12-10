@@ -412,7 +412,7 @@ export default function App() {
     async function fetchStateOnce() {
       try {
          const res = await fetch("https://game-api-4dbs.onrender.com/state", {
-        //const res = await fetch("http://localhost:8000/state", {
+        // const res = await fetch("http://localhost:8000/state", {
           cache: "no-store",
         });
         if (!res.ok) return;
