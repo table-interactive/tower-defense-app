@@ -102,25 +102,13 @@ export default function App() {
 
     // --- POINTS DÉBUT/FIN ---
     const startPoint = new PIXI.Graphics();
-    startPoint
-      .beginFill(0x00ff88)
-      .drawCircle(path[0][0], path[0][1], 25)
-      .endFill();
-    startPoint
-      .beginFill(0x00cc66)
-      .drawCircle(path[0][0], path[0][1], 15)
-      .endFill();
+    startPoint.beginFill(0x00ff88).drawCircle(path[0][0], path[0][1], 25).endFill();
+    startPoint.beginFill(0x00cc66).drawCircle(path[0][0], path[0][1], 15).endFill();
     app.stage.addChild(startPoint);
 
     const endPoint = new PIXI.Graphics();
-    endPoint
-      .beginFill(0xff4444)
-      .drawCircle(path[path.length - 1][0], path[path.length - 1][1], 25)
-      .endFill();
-    endPoint
-      .beginFill(0xcc3333)
-      .drawCircle(path[path.length - 1][0], path[path.length - 1][1], 15)
-      .endFill();
+    endPoint.beginFill(0xff4444).drawCircle(path[path.length - 1][0], path[path.length - 1][1], 25).endFill();
+    endPoint.beginFill(0xcc3333).drawCircle(path[path.length - 1][0], path[path.length - 1][1], 15).endFill();
     app.stage.addChild(endPoint);
 
     // --- OVERLAY ATTENTE ---
@@ -138,19 +126,41 @@ export default function App() {
     waitText.position.set(600, 350);
     waitOverlay.addChild(waitText);
     waitOverlay.visible = true;
-    app.stage.addChild(waitOverlay);
 
-    // --- SLOTS TOURS ---
+    // --- SLOTS TOURS (EMPLACEMENTS VISIBLES) ---
     const slotsLayer = new PIXI.Container();
-    app.stage.addChild(slotsLayer);
-    
+    const SLOT_RADIUS = 25;
+    const SLOT_RING = 4;
+
+    // Aligne avec les positions de tes bornes backend
+    const SLOTS = [
+      { id: "", x: 250, y: 250 },
+      { id: "", x: 400, y: 100 },
+      { id: "", x: 650, y: 300 },
+    ];
+
+    for (const s of SLOTS) {
+      const g = new PIXI.Graphics();
+      g.lineStyle(SLOT_RING, 0x4affff, 1);
+      g.beginFill(0x0a0e27);
+      g.drawCircle(0, 0, SLOT_RADIUS);
+      g.endFill();
+
+      const label = new PIXI.Text(s.id, {
+        fill: "#88ccee",
+        fontSize: 12,
+        fontWeight: "bold",
+        fontFamily: "Arial",
+      });
+      label.anchor.set(0.5, -1.5);
+      g.x = s.x;
+      g.y = s.y;
+      g.addChild(label);
+      slotsLayer.addChild(g);
+    }
+
     // --- TOURS ---
-    type TowerDTO = {
-      towerId: string;
-      towerType: string;
-      x: number;
-      y: number;
-    };
+    type TowerDTO = { towerId: string; towerType: string; x: number; y: number };
     type Tower = {
       id: string;
       type: string;
@@ -162,9 +172,14 @@ export default function App() {
     };
 
     const towersLayer = new PIXI.Container();
-    app.stage.addChild(towersLayer);
     const beamsLayer = new PIXI.Container();
-    app.stage.addChild(beamsLayer);
+
+    // Respecte l’ordre des couches pour qu’on VOIE les slots
+    app.stage.addChild(waitOverlay);   // overlay en haut si attente
+    app.stage.addChild(slotsLayer);    // slots au-dessus de la route
+    app.stage.addChild(towersLayer);   // tours par-dessus slots
+    app.stage.addChild(beamsLayer);    // tirs au-dessus des tours
+
     const towersById = new Map<string, Tower>();
 
     function statsFor(type: string) {
@@ -197,12 +212,7 @@ export default function App() {
       } else if (type === "Healer") {
         base.beginFill(0x2ecc71).drawCircle(0, 0, 18).endFill();
         const cross = new PIXI.Graphics();
-        cross
-          .lineStyle(3, 0xffffff)
-          .moveTo(-5, 0)
-          .lineTo(5, 0)
-          .moveTo(0, -5)
-          .lineTo(0, 5);
+        cross.lineStyle(3, 0xffffff).moveTo(-5, 0).lineTo(5, 0).moveTo(0, -5).lineTo(0, 5);
         g.addChild(base, cross);
       }
       g.x = x;
@@ -229,30 +239,34 @@ export default function App() {
           };
           towersById.set(dto.towerId, t);
           towersLayer.addChild(node);
-        } else if (t.type !== dto.towerType) {
-          towersLayer.removeChild(t.node);
-          t.node.destroy({ children: true });
-          t.node = drawTowerNode(dto.x, dto.y, dto.towerType);
-          towersLayer.addChild(t.node);
-          t.type = dto.towerType;
-          const { range, cooldownMs } = statsFor(dto.towerType);
-          t.range = range;
-          t.cooldownMs = cooldownMs;
+        } else {
+          // update type si remplacée
+          if (t.type !== dto.towerType) {
+            towersLayer.removeChild(t.node);
+            t.node.destroy({ children: true });
+            t.node = drawTowerNode(dto.x, dto.y, dto.towerType);
+            towersLayer.addChild(t.node);
+            const { range, cooldownMs } = statsFor(dto.towerType);
+            t.type = dto.towerType;
+            t.range = range;
+            t.cooldownMs = cooldownMs;
+          }
+          // sync position au cas où
+          t.node.x = dto.x;
+          t.node.y = dto.y;
         }
       }
     }
 
-    // --- POLLING /state corrigé ---
+    // --- POLLING /state ---
     let syncTimer: number | null = null;
     async function fetchStateOnce() {
       try {
-        const res = await fetch("https://game-api-4dbs.onrender.com/state", {
-          cache: "no-store",
-        });
+        const res = await fetch("https://game-api-4dbs.onrender.com/state", { cache: "no-store" });
         if (!res.ok) return;
         const json = await res.json();
 
-        // Traduction des champs backend
+        // tours
         if (Array.isArray(json?.towers)) {
           const towers = json.towers.map((t: any) => ({
             towerId: t.towerId ?? t.id,
@@ -263,13 +277,10 @@ export default function App() {
           reconcileTowers(towers);
         }
 
-        // Démarrage via capteur mouvement (START_WAVE)
+        // événements
         const hasWaveEvent =
-          Array.isArray(json?.events) &&
-          json.events.some((e: any) => e.type === "START_WAVE");
-        hasPlayer =
-          hasWaveEvent ||
-          (Array.isArray(json?.players) && json.players.length > 0);
+          Array.isArray(json?.events) && json.events.some((e: any) => e.type === "START_WAVE");
+        hasPlayer = hasWaveEvent || (Array.isArray(json?.players) && json.players.length > 0);
 
         if ((hasWaveEvent || hasPlayer) && !gameStarted) {
           gameStarted = true;
@@ -281,7 +292,9 @@ export default function App() {
         if (!hasPlayer && gameStarted) {
           waitOverlay.visible = true;
         }
-      } catch {}
+      } catch (err) {
+        console.error("Erreur fetchState:", err);
+      }
     }
 
     function startPolling() {
@@ -408,10 +421,7 @@ export default function App() {
       }
 
       msSinceSpawn += dt;
-      const spawnPeriod = Math.max(
-        700,
-        SPAWN_EVERY_MS - (waveInternal - 1) * 50
-      );
+      const spawnPeriod = Math.max(700, SPAWN_EVERY_MS - (waveInternal - 1) * 50);
       if (msSinceSpawn >= spawnPeriod) {
         createEnemy(0, 100 + waveInternal * 6);
         msSinceSpawn = 0;
@@ -483,10 +493,7 @@ export default function App() {
     (app.view as HTMLCanvasElement).addEventListener("click", onCanvasClick);
 
     return () => {
-      (app.view as HTMLCanvasElement).removeEventListener(
-        "click",
-        onCanvasClick
-      );
+      (app.view as HTMLCanvasElement).removeEventListener("click", onCanvasClick);
       stopPolling();
       app.destroy(true, true);
     };
