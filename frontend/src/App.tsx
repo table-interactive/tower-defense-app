@@ -141,22 +141,8 @@ export default function App() {
     app.stage.addChild(waitOverlay);
 
     // --- SLOTS TOURS ---
-    type Slot = {
-      id: string;
-      x: number;
-      y: number;
-      node: PIXI.Graphics;
-      occupied: boolean;
-    };
     const slotsLayer = new PIXI.Container();
     app.stage.addChild(slotsLayer);
-    const SLOT_RADIUS = 24,
-      SLOT_RING = 3
-    const SLOTS = [
-      { id: "S1", x: 250, y: 250 },
-      { id: "S2", x: 650, y: 200 },
-      { id: "S3", x: 950, y: 450 },
-    ];
     
     // --- TOURS ---
     type TowerDTO = {
