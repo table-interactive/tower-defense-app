@@ -1,0 +1,102 @@
+# =========================
+# 📁 GLOBAL
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*$py.class
+*.so
+.DS_Store
+Thumbs.db
+.env
+.env.*
+.vscode/
+.idea/
+*.log
+
+# =========================
+# 🐍 PYTHON BACKEND
+# =========================
+venv/
+env/
+.venv/
+pip-wheel-metadata/
+dist/
+build/
+.eggs/
+*.egg-info/
+*.egg
+*.spec
+instance/
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# =========================
+# ⚛️ REACT FRONTEND
+# =========================
+# Assuming frontend is in a folder named "frontend"
+frontend/node_modules/
+frontend/.next/
+frontend/.nuxt/
+frontend/.expo/
+frontend/.cache/
+frontend/dist/
+frontend/build/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# If frontend uses yarn or pnpm
+frontend/yarn.lock
+frontend/pnpm-lock.yaml
+
+# =========================
+# 🐳 DOCKER / DEPLOY
+# =========================
+*.pid
+*.seed
+*.pid.lock
+docker-compose.override.yml
+*.bak
+*.tmp
+*.swp
+
+# =========================
+# 🧪 TEST / CI
+# =========================
+.tox/
+.nox/
+pytestdebug.log
+test-results/
+junit.xml
+
+# =========================
+# 🪣 MISC / OS / TOOLS
+# =========================
+*.sqlite3
+*.db
+*.sqlite
+*.iml
+*.swp
+*.swo
+.cache/
+*.tar.gz
+*.zip
+*.tgz
+*.gz
+
+# =========================
+# 🧠 CUSTOM
+# =========================
+# Ignore local scripts, configs, and secrets
+local_settings.py
+secrets.json
+config.local.json
+*.pem
+*.crt
+*.key
