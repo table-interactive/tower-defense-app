@@ -698,6 +698,31 @@ export default function App() {
           </div>
         </div>
       </div>
+      <button
+        onClick={async () => {
+          try {
+            await fetch("https://game-api-4dbs.onrender.com/reset", {
+              method: "POST",
+            });
+            window.location.reload(); // simple et efficace
+          } catch (err) {
+            console.error("Erreur reset:", err);
+          }
+        }}
+        style={{
+          cursor: "pointer",
+          background:
+            "linear-gradient(135deg, rgba(255,196,0,0.95) 0%, rgba(255,140,0,0.95) 100%)",
+          color: "#0a1428",
+          fontWeight: 800,
+          border: "2px solid rgba(255,200,120,0.7)",
+          borderRadius: 12,
+          padding: "10px 18px",
+          boxShadow: "0 4px 15px rgba(255,170,0,0.35)",
+        }}
+      >
+        RESET
+      </button>
     </div>
   );
 }
