@@ -348,7 +348,7 @@ export default function App() {
         const towers = Array.isArray(rawTowers)
           ? rawTowers.map((t: any) => ({
               towerId: t.towerId ?? "UNKNOWN",
-              towerType: t.towerType ?? "Healer",
+              towerType: t.towerType ?? "Archer",
               x: Number(t.x ?? 400),
               y: Number(t.y ?? 400),
             }))
@@ -384,9 +384,9 @@ export default function App() {
       fetchStateOnce();
       syncTimer = window.setInterval(fetchStateOnce, 900);
     }
-    function stopPolling() {
-      if (syncTimer) clearInterval(syncTimer);
-    }
+    // function stopPolling() {
+    //   if (syncTimer) clearInterval(syncTimer);
+    // }
     startPolling();
 
     // --- ATTAQUE DES TOURS ---
