@@ -6,14 +6,13 @@ export default function App() {
   const [lives, setLives] = useState(10);
   const [score, setScore] = useState(0);
   const [wave, setWave] = useState(1);
-  const [gameOver, setGameOver] = useState(false);
+  // const [gameOver, setGameOver] = useState(false);
 
   // état “joueur présent ?” et “partie démarrée ?” pour l’UI
-  const [hasPlayerUI, setHasPlayerUI] = useState(false);
 
   // refs pour reset/fetch externes (bouton)
-  const resetRef = useRef<() => void>();
-  const fetchStateRef = useRef<() => void>();
+  const resetRef = useRef<(() => void) | null>(null);
+  const fetchStateRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let maxLives = 10;
@@ -427,7 +426,6 @@ export default function App() {
           ? json.players.length
           : 0;
         hasPlayer = playersCount > 0;
-        setHasPlayerUI(hasPlayer);
 
         // démarrage au premier joueur
         if (hasPlayer && !gameStarted) {
@@ -795,7 +793,7 @@ export default function App() {
           setLives(livesInternal);
           if (livesInternal <= 0) {
             gameOverInternal = true;
-            setGameOver(true);
+            // setGameOver(true);
             gameOverContainer.visible = true;
           }
         }
@@ -812,7 +810,7 @@ export default function App() {
       setLives(10);
       setScore(0);
       setWave(1);
-      setGameOver(false);
+      // setGameOver(false);
       gameOverContainer.visible = false;
 
       // on ne force pas gameStarted ici : il redeviendra true dès qu’un joueur sera détecté
@@ -852,18 +850,18 @@ export default function App() {
   }, []);
 
   // Bouton Reset → /reset puis reset local + refetch
-  const onResetClick = async () => {
-    try {
-       await fetch("https://game-api-4dbs.onrender.com/reset", {
-      //await fetch("http://localhost:8000/reset", {
-        method: "POST",
-      });
-    } catch {
-      /* même si l’API échoue, on reset côté client */
-    }
-    resetRef.current?.();
-    fetchStateRef.current?.();
-  };
+  // const onResetClick = async () => {
+  //   try {
+  //      await fetch("https://game-api-4dbs.onrender.com/reset", {
+  //     //await fetch("http://localhost:8000/reset", {
+  //       method: "POST",
+  //     });
+  //   } catch {
+  //     /* même si l’API échoue, on reset côté client */
+  //   }
+  //   resetRef.current?.();
+  //   fetchStateRef.current?.();
+  // };
 
   // --- UI / HUD ---
   return (
