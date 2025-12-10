@@ -151,28 +151,13 @@ export default function App() {
     const slotsLayer = new PIXI.Container();
     app.stage.addChild(slotsLayer);
     const SLOT_RADIUS = 24,
-      SLOT_RING = 3,
-      SNAP_RADIUS = 28;
+      SLOT_RING = 3
     const SLOTS = [
       { id: "S1", x: 250, y: 250 },
       { id: "S2", x: 650, y: 200 },
       { id: "S3", x: 950, y: 450 },
     ];
-    const slots: Slot[] = SLOTS.map(({ id, x, y }) => {
-      const g = new PIXI.Graphics();
-      g.lineStyle(SLOT_RING, 0x7a8699, 0.9).drawCircle(0, 0, SLOT_RADIUS);
-      g.x = x;
-      g.y = y;
-      slotsLayer.addChild(g);
-      return { id, x, y, node: g, occupied: false };
-    });
-    function setSlotOccupied(slot: Slot, occupied: boolean) {
-      slot.occupied = occupied;
-      slot.node.clear();
-      slot.node.lineStyle(SLOT_RING, occupied ? 0x4affff : 0x7a8699);
-      slot.node.drawCircle(0, 0, SLOT_RADIUS);
-    }
-
+    
     // --- TOURS ---
     type TowerDTO = {
       towerId: string;
