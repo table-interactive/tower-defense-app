@@ -6,11 +6,7 @@ export default function App() {
   const [lives, setLives] = useState(10);
   const [score, setScore] = useState(0);
   const [wave, setWave] = useState(1);
-  // const [gameOver, setGameOver] = useState(false);
 
-  // état “joueur présent ?” et “partie démarrée ?” pour l’UI
-
-  // refs pour reset/fetch externes (bouton)
   const resetRef = useRef<(() => void) | null>(null);
   const fetchStateRef = useRef<(() => void) | null>(null);
 
@@ -30,12 +26,9 @@ export default function App() {
     let scoreInternal = 0;
     let waveInternal = 1;
     let gameOverInternal = false;
+    let hasPlayer = false;
+    let gameStarted = false;
 
-    // Contrôle du démarrage/pauses selon présence de joueurs
-    let hasPlayer = false; // vrai s’il y a ≥1 joueur dans /state
-    let gameStarted = false; // passe à true au premier joueur détecté
-
-    // Vagues basées sur les kills
     let killsThisWave = 0;
     const waveTarget = (w: number) => 10 + (w - 1) * 5;
     const maybeAdvanceWave = () => {
@@ -107,6 +100,7 @@ export default function App() {
       roadCenter.lineTo(path[i][0], path[i][1]);
     app.stage.addChild(roadCenter);
 
+    // --- POINTS DÉBUT/FIN ---
     const startPoint = new PIXI.Graphics();
     startPoint
       .beginFill(0x00ff88)
@@ -129,24 +123,7 @@ export default function App() {
       .endFill();
     app.stage.addChild(endPoint);
 
-    // --- PARTICULES ---
-    const particles = new PIXI.Container();
-    app.stage.addChild(particles);
-    for (let i = 0; i < 30; i++) {
-      const p = new PIXI.Graphics() as PIXI.Graphics & {
-        vx: number;
-        vy: number;
-      };
-      p.beginFill(0x4affff, Math.random() * 0.3);
-      p.drawCircle(0, 0, Math.random() * 3 + 1).endFill();
-      p.x = Math.random() * 1200;
-      p.y = Math.random() * 700;
-      p.vx = (Math.random() - 0.5) * 0.5;
-      p.vy = (Math.random() - 0.5) * 0.5;
-      particles.addChild(p);
-    }
-
-    // --- OVERLAY ATTENTE/PAUSE ---
+    // --- OVERLAY ATTENTE ---
     const waitOverlay = new PIXI.Container();
     const waitBg = new PIXI.Graphics();
     waitBg.beginFill(0x000000, 0.6).drawRect(0, 0, 1200, 700).endFill();
@@ -160,10 +137,10 @@ export default function App() {
     waitText.anchor.set(0.5);
     waitText.position.set(600, 350);
     waitOverlay.addChild(waitText);
-    waitOverlay.visible = true; // au démarrage, pas de joueur → attente
+    waitOverlay.visible = true;
     app.stage.addChild(waitOverlay);
 
-    // --- SLOTS (3 EMPLACEMENTS) ---
+    // --- SLOTS TOURS ---
     type Slot = {
       id: string;
       x: number;
@@ -176,47 +153,27 @@ export default function App() {
     const SLOT_RADIUS = 24,
       SLOT_RING = 3,
       SNAP_RADIUS = 28;
-    const SLOTS: { id: string; x: number; y: number }[] = [
+    const SLOTS = [
       { id: "S1", x: 250, y: 250 },
       { id: "S2", x: 650, y: 200 },
       { id: "S3", x: 950, y: 450 },
     ];
     const slots: Slot[] = SLOTS.map(({ id, x, y }) => {
       const g = new PIXI.Graphics();
-      g.lineStyle(SLOT_RING, 0x7a8699, 0.9)
-        .drawCircle(0, 0, SLOT_RADIUS)
-        .endFill();
+      g.lineStyle(SLOT_RING, 0x7a8699, 0.9).drawCircle(0, 0, SLOT_RADIUS);
       g.x = x;
       g.y = y;
-      g.alpha = 0.95;
       slotsLayer.addChild(g);
       return { id, x, y, node: g, occupied: false };
     });
     function setSlotOccupied(slot: Slot, occupied: boolean) {
       slot.occupied = occupied;
       slot.node.clear();
-      slot.node.lineStyle(
-        SLOT_RING,
-        occupied ? 0x4affff : 0x7a8699,
-        occupied ? 1 : 0.9
-      );
-      slot.node.drawCircle(0, 0, SLOT_RADIUS).endFill();
-    }
-    function findNearestFreeSlot(x: number, y: number): Slot | null {
-      let best: Slot | null = null;
-      let bestD = Infinity;
-      for (const s of slots) {
-        if (s.occupied) continue;
-        const d = Math.hypot(s.x - x, s.y - y);
-        if (d < bestD) {
-          bestD = d;
-          best = s;
-        }
-      }
-      return best && bestD <= SNAP_RADIUS ? best : null;
+      slot.node.lineStyle(SLOT_RING, occupied ? 0x4affff : 0x7a8699);
+      slot.node.drawCircle(0, 0, SLOT_RADIUS);
     }
 
-    // --- TOURS (depuis API, attaque incluse) ---
+    // --- TOURS ---
     type TowerDTO = {
       towerId: string;
       towerType: string;
@@ -233,6 +190,12 @@ export default function App() {
       beamLayer: PIXI.Container;
     };
 
+    const towersLayer = new PIXI.Container();
+    app.stage.addChild(towersLayer);
+    const beamsLayer = new PIXI.Container();
+    app.stage.addChild(beamsLayer);
+    const towersById = new Map<string, Tower>();
+
     function statsFor(type: string) {
       if (type === "Archer") return { range: 320, cooldownMs: 800 };
       if (type === "Swordsman") return { range: 200, cooldownMs: 250 };
@@ -240,13 +203,6 @@ export default function App() {
       if (type === "Healer") return { range: 180, cooldownMs: 5000 };
       return { range: 180, cooldownMs: 800 };
     }
-
-    const towersLayer = new PIXI.Container();
-    app.stage.addChild(towersLayer);
-    const beamsLayer = new PIXI.Container();
-    app.stage.addChild(beamsLayer);
-    const towersById = new Map<string, Tower>();
-    const towerToSlot = new Map<string, string>(); // towerId -> slotId
 
     function drawTowerNode(x: number, y: number, type: string) {
       const g = new PIXI.Container();
@@ -261,7 +217,6 @@ export default function App() {
         base.beginFill(0x5f2a1a).drawCircle(0, 0, 20).endFill();
         const sword = new PIXI.Graphics();
         sword.lineStyle(3, 0xffaa00).moveTo(0, -12).lineTo(0, 12);
-        sword.lineStyle(1, 0xffee99).moveTo(-4, -12).lineTo(-4, 12);
         g.addChild(base, sword);
       } else if (type === "Mage") {
         base.beginFill(0x6633cc).drawCircle(0, 0, 18).endFill();
@@ -279,182 +234,95 @@ export default function App() {
           .lineTo(0, 5);
         g.addChild(base, cross);
       }
-
       g.x = x;
       g.y = y;
       return g;
     }
-    function createOrUpdateTower(dto: TowerDTO, tx: number, ty: number) {
-      let t = towersById.get(dto.towerId);
 
-      const ensureNodeForType = (type: string) => {
-        const node = drawTowerNode(tx, ty, type);
-        towersLayer.addChild(node);
-        return node;
-      };
-
-      if (!t) {
-        const node = ensureNodeForType(dto.towerType);
-        const beamLayer = new PIXI.Container();
-        beamsLayer.addChild(beamLayer);
-        const { range, cooldownMs } = statsFor(dto.towerType);
-
-        t = {
-          id: dto.towerId,
-          type: dto.towerType, // <= NEW
-          node,
-          range,
-          cooldownMs,
-          lastShotAt: 0,
-          beamLayer,
-        };
-        towersById.set(dto.towerId, t);
-      } else {
-        // si le type a changé, on remplace le visuel + les stats
-        if (t.type !== dto.towerType) {
+    function reconcileTowers(serverTowers: TowerDTO[]) {
+      for (const dto of serverTowers) {
+        let t = towersById.get(dto.towerId);
+        if (!t) {
+          const node = drawTowerNode(dto.x, dto.y, dto.towerType);
+          const beamLayer = new PIXI.Container();
+          beamsLayer.addChild(beamLayer);
+          const { range, cooldownMs } = statsFor(dto.towerType);
+          t = {
+            id: dto.towerId,
+            type: dto.towerType,
+            node,
+            range,
+            cooldownMs,
+            lastShotAt: 0,
+            beamLayer,
+          };
+          towersById.set(dto.towerId, t);
+          towersLayer.addChild(node);
+        } else if (t.type !== dto.towerType) {
           towersLayer.removeChild(t.node);
           t.node.destroy({ children: true });
-          t.node = ensureNodeForType(dto.towerType);
+          t.node = drawTowerNode(dto.x, dto.y, dto.towerType);
+          towersLayer.addChild(t.node);
           t.type = dto.towerType;
           const { range, cooldownMs } = statsFor(dto.towerType);
           t.range = range;
           t.cooldownMs = cooldownMs;
-          // on reset le cycle de tir pour un feedback immédiat
-          t.lastShotAt = 0;
-        } else {
-          // sinon juste interpolation de la position
-          t.node.x += (tx - t.node.x) * 0.35;
-          t.node.y += (ty - t.node.y) * 0.35;
         }
       }
     }
 
-    function drawBeam(
-      ox: number,
-      oy: number,
-      tx: number,
-      ty: number,
-      layer: PIXI.Container
-    ) {
-      const g = new PIXI.Graphics();
-      g.lineStyle(2, 0x4affff, 0.9);
-      g.moveTo(ox, oy);
-      g.lineTo(tx, ty);
-      layer.addChild(g);
-      let alpha = 1;
-      const fade = () => {
-        alpha -= 0.2;
-        g.alpha = alpha;
-        if (alpha <= 0) {
-          layer.removeChild(g);
-          g.destroy();
-        } else requestAnimationFrame(fade);
-      };
-      requestAnimationFrame(fade);
-    }
-    function reconcileTowers(
-      serverTowers: {
-        towerId: string;
-        towerType: string;
-        x: number;
-        y: number;
-      }[]
-    ) {
-      const seen = new Set<string>();
-      for (const s of slots) setSlotOccupied(s, false);
-
-      for (const dto of serverTowers) {
-        seen.add(dto.towerId);
-
-        let tx = dto.x,
-          ty = dto.y;
-        let snappedSlotId = towerToSlot.get(dto.towerId) || null;
-        if (!snappedSlotId) {
-          const slot = findNearestFreeSlot(dto.x, dto.y);
-          if (slot) {
-            snappedSlotId = slot.id;
-            towerToSlot.set(dto.towerId, slot.id);
-          }
-        }
-        if (snappedSlotId) {
-          const slot = slots.find((s) => s.id === snappedSlotId)!;
-          tx = slot.x;
-          ty = slot.y;
-          setSlotOccupied(slot, true);
-        }
-
-        // Création/mise à jour de la tour selon son type
-        createOrUpdateTower(dto, tx, ty);
-      }
-
-      // Suppression des tours disparues côté serveur
-      for (const [id, t] of [...towersById.entries()]) {
-        if (!seen.has(id)) {
-          towersLayer.removeChild(t.node);
-          t.node.destroy({ children: true });
-          beamsLayer.removeChild(t.beamLayer);
-          t.beamLayer.destroy({ children: true });
-          towersById.delete(id);
-
-          const sid = towerToSlot.get(id);
-          if (sid) {
-            const s = slots.find((x) => x.id === sid);
-            if (s) setSlotOccupied(s, false);
-          }
-          towerToSlot.delete(id);
-        }
-      }
-    }
-
-    // --- POLLING /state ---
+    // --- POLLING /state corrigé ---
     let syncTimer: number | null = null;
     async function fetchStateOnce() {
       try {
-         const res = await fetch("https://game-api-4dbs.onrender.com/state", {
-        // const res = await fetch("http://localhost:8000/state", {
+        const res = await fetch("https://game-api-4dbs.onrender.com/state", {
           cache: "no-store",
         });
         if (!res.ok) return;
         const json = await res.json();
 
-        // tours
-        if (Array.isArray(json?.towers))
-          reconcileTowers(json.towers as TowerDTO[]);
+        // Traduction des champs backend
+        if (Array.isArray(json?.towers)) {
+          const towers = json.towers.map((t: any) => ({
+            towerId: t.towerId ?? t.id,
+            towerType: t.towerType ?? t.type,
+            x: t.x,
+            y: t.y,
+          }));
+          reconcileTowers(towers);
+        }
 
-        // joueurs
-        const playersCount = Array.isArray(json?.players)
-          ? json.players.length
-          : 0;
-        hasPlayer = playersCount > 0;
+        // Démarrage via capteur mouvement (START_WAVE)
+        const hasWaveEvent =
+          Array.isArray(json?.events) &&
+          json.events.some((e: any) => e.type === "START_WAVE");
+        hasPlayer =
+          hasWaveEvent ||
+          (Array.isArray(json?.players) && json.players.length > 0);
 
-        // démarrage au premier joueur
-        if (hasPlayer && !gameStarted) {
+        if ((hasWaveEvent || hasPlayer) && !gameStarted) {
           gameStarted = true;
           waitOverlay.visible = false;
-          // petit kick de départ (optionnel)
-          msSinceSpawn = SPAWN_EVERY_MS; // force un spawn rapide à la prochaine frame
+          msSinceSpawn = SPAWN_EVERY_MS;
+          console.log("🎮 Partie démarrée !");
         }
-        // pause si plus de joueur
+
         if (!hasPlayer && gameStarted) {
           waitOverlay.visible = true;
         }
-      } catch {
-        // silencieux
-      }
+      } catch {}
     }
+
     function startPolling() {
       fetchStateOnce();
       syncTimer = window.setInterval(fetchStateOnce, 900);
     }
     function stopPolling() {
-      if (syncTimer !== null) {
-        clearInterval(syncTimer);
-        syncTimer = null;
-      }
+      if (syncTimer) clearInterval(syncTimer);
     }
     startPolling();
 
-    // --- ENNEMIS ---
+    // --- ENNEMIS / TICKER / COMBAT ---
     interface Enemy {
       sprite: PIXI.Container;
       progress: number;
@@ -465,6 +333,9 @@ export default function App() {
       reachedEnd: boolean;
     }
     const enemies: Enemy[] = [];
+    const enemiesLayer = new PIXI.Container();
+    app.stage.addChild(enemiesLayer);
+
     function placeEnemyAtDistance(e: Enemy, dist: number) {
       let d = dist;
       for (const seg of segments) {
@@ -478,103 +349,40 @@ export default function App() {
       }
       return true;
     }
-    const enemiesLayer = new PIXI.Container();
-    app.stage.addChild(enemiesLayer);
-    const createEnemy = (offsetDist = 0, speedPxPerSec = 110) => {
-      const isMiniBoss = waveInternal % 5 === 0 && Math.random() < 0.15; // un boss sur ~15% des spawns pendant la vague
+
+    function createEnemy(offsetDist = 0, speedPxPerSec = 110) {
       const c = new PIXI.Container();
-
-      const shadow = new PIXI.Graphics();
-      shadow
-        .beginFill(0x000000, 0.3)
-        .drawEllipse(
-          0,
-          isMiniBoss ? 8 : 5,
-          isMiniBoss ? 25 : 15,
-          isMiniBoss ? 12 : 8
-        )
-        .endFill();
-      c.addChild(shadow);
-
       const body = new PIXI.Graphics();
-      body
-        .beginFill(isMiniBoss ? 0x9933ff : 0xff3333)
-        .drawCircle(0, 0, isMiniBoss ? 25 : 14)
-        .endFill();
+      body.beginFill(0xff3333).drawCircle(0, 0, 14).endFill();
       c.addChild(body);
-
-      const glow = new PIXI.Graphics();
-      glow
-        .beginFill(isMiniBoss ? 0xbb88ff : 0xff6666, 0.3)
-        .drawCircle(0, 0, isMiniBoss ? 35 : 20)
-        .endFill();
-      glow.alpha = 0;
-      c.addChild(glow);
-
       enemiesLayer.addChild(c);
-
       const e: Enemy = {
         sprite: c,
         progress: offsetDist,
-        glow,
+        glow: new PIXI.Graphics(),
         rotation: 0,
-        speed: isMiniBoss ? 60 : speedPxPerSec,
-        hp: isMiniBoss ? 10 : 3,
+        speed: speedPxPerSec,
+        hp: 3,
         reachedEnd: false,
       };
       placeEnemyAtDistance(e, e.progress);
       enemies.push(e);
-    };
+    }
 
-    // spawn timing (actif seulement si hasPlayer && gameStarted)
     let msSinceSpawn = 0;
     const SPAWN_EVERY_MS = 1200;
 
-    // --- GAME OVER OVERLAY ---
-    const gameOverContainer = new PIXI.Container();
-    gameOverContainer.visible = false;
-    const gameOverBg = new PIXI.Graphics();
-    gameOverBg.beginFill(0x000000, 0.8).drawRect(0, 0, 1200, 700).endFill();
-    gameOverContainer.addChild(gameOverBg);
-    const gameOverText = new PIXI.Text("PARTIE TERMINÉE", {
-      fill: "#ff4444",
-      fontSize: 80,
-      fontWeight: "bold",
-      fontFamily: "Arial",
-      dropShadow: true,
-      dropShadowColor: "#000000",
-      dropShadowBlur: 10,
-      dropShadowDistance: 5,
-    });
-    gameOverText.anchor.set(0.5);
-    gameOverText.position.set(600, 300);
-    gameOverContainer.addChild(gameOverText);
-    const restartText = new PIXI.Text("Cliquez pour redémarrer", {
-      fill: "#4affff",
-      fontSize: 32,
-      fontFamily: "Arial",
-    });
-    restartText.anchor.set(0.5);
-    restartText.position.set(600, 400);
-    gameOverContainer.addChild(restartText);
-    app.stage.addChild(gameOverContainer);
-
-    // --- ALERTE MINI-BOSS ---
+    // --- ALERTE BOSS ---
     const bossAlert = new PIXI.Text("⚠️ MINI-BOSS ⚠️", {
       fill: "#ffcc00",
       fontSize: 60,
       fontWeight: "bold",
       fontFamily: "Arial",
-      dropShadow: true,
-      dropShadowColor: "#000000",
-      dropShadowBlur: 8,
-      dropShadowDistance: 4,
     });
     bossAlert.anchor.set(0.5);
     bossAlert.position.set(600, 100);
     bossAlert.visible = false;
     app.stage.addChild(bossAlert);
-
     function showBossAlert() {
       bossAlert.visible = true;
       bossAlert.alpha = 1;
@@ -582,7 +390,6 @@ export default function App() {
       const fade = (delta: number) => {
         elapsed += delta;
         if (elapsed > 150) {
-          // ~2.5s at 60fps
           bossAlert.alpha -= 0.05;
           if (bossAlert.alpha <= 0) {
             bossAlert.visible = false;
@@ -593,21 +400,15 @@ export default function App() {
       app.ticker.add(fade);
     }
 
-    // --- ATTAQUES DES TOURS (désactivées si pas de joueur) ---
+    // --- ATTAQUES TOURS ---
     function towersAttack(nowMs: number) {
       if (!hasPlayer || !gameStarted) return;
       if (towersById.size === 0 || enemies.length === 0) return;
-
       for (const t of towersById.values()) {
-        // On ignore les healers ici, ils soignent via le timer global
         if (t.type === "Healer") continue;
-
         if (nowMs - t.lastShotAt < t.cooldownMs) continue;
-
         let best: Enemy | null = null;
         let bestD = Infinity;
-
-        // Recherche de la cible la plus proche
         for (const e of enemies) {
           if (e.hp <= 0) continue;
           const d = Math.hypot(t.node.x - e.sprite.x, t.node.y - e.sprite.y);
@@ -616,127 +417,18 @@ export default function App() {
             best = e;
           }
         }
-
         if (!best) continue;
         t.lastShotAt = nowMs;
-
-        // --- Attaque selon le type de tour ---
-        if (t.type === "Mage") {
-          // Dégâts directs à la cible
-          best.hp -= 2;
-
-          // Dégâts de zone autour de la cible
-          for (const e of enemies) {
-            if (e === best || e.hp <= 0) continue;
-            const d = Math.hypot(
-              e.sprite.x - best.sprite.x,
-              e.sprite.y - best.sprite.y
-            );
-            if (d <= 140) {
-              // rayon de splash
-              e.hp -= 1;
-            }
-          }
-
-          // Effet visuel explosion AoE
-          const explosion = new PIXI.Graphics();
-          explosion.beginFill(0xff6600, 0.8).drawCircle(0, 0, 20).endFill();
-          explosion.x = best.sprite.x;
-          explosion.y = best.sprite.y;
-          enemiesLayer.addChild(explosion);
-
-          let scale = 1;
-          let alpha = 1;
-          const fade = () => {
-            scale += 0.1;
-            alpha -= 0.07;
-            explosion.scale.set(scale);
-            explosion.alpha = alpha;
-            if (alpha <= 0) {
-              enemiesLayer.removeChild(explosion);
-              explosion.destroy();
-            } else {
-              requestAnimationFrame(fade);
-            }
-          };
-          requestAnimationFrame(fade);
-
-          drawBeam(
-            t.node.x,
-            t.node.y,
-            best.sprite.x,
-            best.sprite.y,
-            t.beamLayer
-          );
-          continue;
-        }
-
-        // --- Tours offensives normales (Archer, Swordsman, etc.) ---
         best.hp -= 1;
-        drawBeam(t.node.x, t.node.y, best.sprite.x, best.sprite.y, t.beamLayer);
       }
     }
 
-    // --- TICKER ---
+    // --- GAME LOOP ---
     app.ticker.add(() => {
       if (gameOverInternal) return;
       const dt = app.ticker.deltaMS;
       const now = performance.now();
 
-      // particules
-      particles.children.forEach((pp) => {
-        const particle = pp as PIXI.Graphics & { vx: number; vy: number };
-        pp.x += particle.vx;
-        pp.y += particle.vy;
-        if (pp.x < 0) pp.x = 1200;
-        if (pp.x > 1200) pp.x = 0;
-        if (pp.y < 0) pp.y = 700;
-        if (pp.y > 700) pp.y = 0;
-      });
-
-      // --- SOIN GLOBAL (HEALERS) ---
-      let healTimerActive = false;
-
-      function startHealTimer() {
-        if (healTimerActive) return;
-        healTimerActive = true;
-        setInterval(() => {
-          if (!hasPlayer || !gameStarted) return;
-
-          // Vérifie s'il existe au moins un healer
-          const hasHealer = Array.from(towersById.values()).some(
-            (t) => t.type === "Healer"
-          );
-          if (!hasHealer) return;
-
-          // Applique un soin global de +1 (ou selon ton design)
-          if (livesInternal < maxLives) {
-            livesInternal = Math.min(maxLives, livesInternal + 1);
-            setLives(livesInternal);
-
-            // Effet visuel : halo vert au centre du terrain
-            const healPulse = new PIXI.Graphics();
-            healPulse.lineStyle(5, 0x2ecc71, 0.9).drawCircle(600, 350, 20);
-            app.stage.addChild(healPulse);
-            let alpha = 1;
-            const animate = () => {
-              alpha -= 0.05;
-              healPulse.alpha = alpha;
-              healPulse.scale.set(1 + (1 - alpha));
-              if (alpha <= 0) {
-                app.stage.removeChild(healPulse);
-                healPulse.destroy();
-              } else requestAnimationFrame(animate);
-            };
-            requestAnimationFrame(animate);
-          }
-        }, 5000);
-      }
-
-      // Démarre le soin automatique
-      startHealTimer();
-
-      // Pas de joueur → pause complète (pas de spawn, pas de mouvement)
       if (!hasPlayer || !gameStarted) {
         waitOverlay.visible = true;
         return;
@@ -744,7 +436,6 @@ export default function App() {
         waitOverlay.visible = false;
       }
 
-      // spawn ennemis
       msSinceSpawn += dt;
       const spawnPeriod = Math.max(
         700,
@@ -755,20 +446,14 @@ export default function App() {
         msSinceSpawn = 0;
       }
 
-      // move ennemis
       for (let i = 0; i < enemies.length; i++) {
         const e = enemies[i];
-        e.rotation += 0.06;
-        (e.sprite.children[1] as PIXI.Graphics).rotation = e.rotation;
-        e.glow.alpha = Math.sin(Date.now() * 0.01 + i) * 0.3 + 0.3;
         e.progress += e.speed * (dt / 1000);
         e.reachedEnd = placeEnemyAtDistance(e, e.progress);
       }
 
-      // attaques
       towersAttack(now);
 
-      // morts + score + progression vague
       for (let i = enemies.length - 1; i >= 0; i--) {
         const e = enemies[i];
         if (e.hp <= 0) {
@@ -780,11 +465,6 @@ export default function App() {
           killsThisWave += 1;
           maybeAdvanceWave();
         }
-      }
-
-      // arrivées au bout
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        const e = enemies[i];
         if (e.reachedEnd) {
           enemiesLayer.removeChild(e.sprite);
           e.sprite.destroy({ children: true });
@@ -793,15 +473,31 @@ export default function App() {
           setLives(livesInternal);
           if (livesInternal <= 0) {
             gameOverInternal = true;
-            // setGameOver(true);
             gameOverContainer.visible = true;
           }
         }
       }
     });
 
-    // --- RESET LOCAL réutilisable (bouton & restart)
-    const hardResetLocal = () => {
+    // --- GAME OVER ---
+    const gameOverContainer = new PIXI.Container();
+    gameOverContainer.visible = false;
+    const gameOverBg = new PIXI.Graphics();
+    gameOverBg.beginFill(0x000000, 0.8).drawRect(0, 0, 1200, 700).endFill();
+    gameOverContainer.addChild(gameOverBg);
+    const gameOverText = new PIXI.Text("PARTIE TERMINÉE", {
+      fill: "#ff4444",
+      fontSize: 80,
+      fontWeight: "bold",
+      fontFamily: "Arial",
+    });
+    gameOverText.anchor.set(0.5);
+    gameOverText.position.set(600, 300);
+    gameOverContainer.addChild(gameOverText);
+    app.stage.addChild(gameOverContainer);
+
+    const onCanvasClick = () => {
+      if (!gameOverInternal) return;
       gameOverInternal = false;
       livesInternal = 10;
       scoreInternal = 0;
@@ -810,35 +506,11 @@ export default function App() {
       setLives(10);
       setScore(0);
       setWave(1);
-      // setGameOver(false);
       gameOverContainer.visible = false;
-
-      // on ne force pas gameStarted ici : il redeviendra true dès qu’un joueur sera détecté
-      gameStarted = false;
-
-      enemies.forEach((e) => {
-        enemiesLayer.removeChild(e.sprite);
-        e.sprite.destroy({ children: true });
-      });
-      enemies.length = 0;
-      msSinceSpawn = 0;
-
-      // si déjà un joueur présent, l’overlay se fermera au prochain poll
       waitOverlay.visible = !hasPlayer;
-    };
-    resetRef.current = hardResetLocal;
-    fetchStateRef.current = () => {
-      void fetchStateOnce();
-    };
-
-    // --- RESTART SUR CLIC uniquement si game over (sinon on laisse le capteur gérer)
-    const onCanvasClick = () => {
-      if (!gameOverInternal) return;
-      hardResetLocal();
     };
     (app.view as HTMLCanvasElement).addEventListener("click", onCanvasClick);
 
-    // --- CLEANUP ---
     return () => {
       (app.view as HTMLCanvasElement).removeEventListener(
         "click",
@@ -849,21 +521,7 @@ export default function App() {
     };
   }, []);
 
-  // Bouton Reset → /reset puis reset local + refetch
-  // const onResetClick = async () => {
-  //   try {
-  //      await fetch("https://game-api-4dbs.onrender.com/reset", {
-  //     //await fetch("http://localhost:8000/reset", {
-  //       method: "POST",
-  //     });
-  //   } catch {
-  //     /* même si l’API échoue, on reset côté client */
-  //   }
-  //   resetRef.current?.();
-  //   fetchStateRef.current?.();
-  // };
-
-  // --- UI / HUD ---
+  // --- INTERFACE / HUD ---
   return (
     <div
       style={{
@@ -886,7 +544,7 @@ export default function App() {
           }}
         />
 
-        {/* HUD gauche */}
+        {/* --- HUD --- */}
         <div
           style={{
             position: "absolute",
@@ -897,7 +555,7 @@ export default function App() {
             flexDirection: "column",
           }}
         >
-          {/* Vies */}
+          {/* VIES */}
           <div
             style={{
               background:
@@ -922,20 +580,13 @@ export default function App() {
               >
                 VIES
               </div>
-              <div
-                style={{
-                  fontSize: 28,
-                  color: "#fff",
-                  fontWeight: "bold",
-                  lineHeight: 1,
-                }}
-              >
+              <div style={{ fontSize: 28, color: "#fff", fontWeight: "bold" }}>
                 {lives}
               </div>
             </div>
           </div>
 
-          {/* Score */}
+          {/* SCORE */}
           <div
             style={{
               background:
@@ -961,19 +612,14 @@ export default function App() {
                 SCORE
               </div>
               <div
-                style={{
-                  fontSize: 28,
-                  color: "#0a1428",
-                  fontWeight: "bold",
-                  lineHeight: 1,
-                }}
+                style={{ fontSize: 28, color: "#0a1428", fontWeight: "bold" }}
               >
                 {score}
               </div>
             </div>
           </div>
 
-          {/* Vague */}
+          {/* VAGUE */}
           <div
             style={{
               background:
@@ -998,14 +644,7 @@ export default function App() {
               >
                 VAGUE
               </div>
-              <div
-                style={{
-                  fontSize: 28,
-                  color: "#fff",
-                  fontWeight: "bold",
-                  lineHeight: 1,
-                }}
-              >
+              <div style={{ fontSize: 28, color: "#fff", fontWeight: "bold" }}>
                 {wave}
               </div>
             </div>
@@ -1034,7 +673,6 @@ export default function App() {
               fontSize: 24,
               color: "#0a1428",
               fontWeight: "bold",
-              letterSpacing: 2,
             }}
           >
             Table interactive
@@ -1043,8 +681,7 @@ export default function App() {
           <button
             onClick={async () => {
               try {
-               await fetch("https://game-api-4dbs.onrender.com/reset", {
-               // await fetch("http://localhost:8000/reset", {
+                await fetch("https://game-api-4dbs.onrender.com/reset", {
                   method: "POST",
                 });
               } catch {}
@@ -1062,8 +699,6 @@ export default function App() {
               padding: "10px 18px",
               boxShadow: "0 4px 15px rgba(255,170,0,0.35)",
             }}
-            aria-label="Reset game"
-            title="Reset (API + Client)"
           >
             RESET
           </button>
