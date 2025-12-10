@@ -9,8 +9,8 @@ export default function App() {
 
   useEffect(() => {
     // --- CONFIG API ---
-    // const API_URL = "https://game-api-4dbs.onrender.com"; // prod
-    const API_URL = "http://127.0.0.1:8000"; // dev
+    const API_URL = "https://game-api-4dbs.onrender.com"; // prod
+    // const API_URL = "http://127.0.0.1:8000"; // dev
 
     // --- PIXI ---
     const app = new PIXI.Application({
